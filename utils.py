@@ -216,7 +216,8 @@ class Constellation(object):
         The time step to use when computing satellite positions in an exposure
     """
 
-    def __init__(self, sat_tle_list, alt_limit=30., fov=3.5, tstep=5., exptime=30.):
+    def __init__(self, sat_tle_list, alt_limit=30., fov=3.5, tstep=5., exptime=30., seed=42):
+        np.random.seed(seed)
         self.sat_list = [ephem.readtle(tle.split('\n')[0], tle.split('\n')[1], tle.split('\n')[2]) for tle in sat_tle_list]
         self.alt_limit_rad = np.radians(alt_limit)
         self.fov_rad = np.radians(fov)
@@ -261,6 +262,10 @@ class Constellation(object):
         for sat in self.sat_list:
             sat._epoch += advance
 
+    def set_epoch(self, mjd):
+        for sat in self.sat_list:
+            sat._epoch = mjd
+
     def update_mjd(self, mjd, indx=None):
         """
         mjd : float
@@ -284,7 +289,7 @@ class Constellation(object):
             try:
                 sat.compute(self.observer)
             except ValueError:
-                self.advance_epoch()
+                self.set_epoch(self.observer.date+np.random.uniform()*10)
                 sat.compute(self.observer)
             self.altitudes_rad.append(sat.alt)
             self.azimuth_rad.append(sat.az)

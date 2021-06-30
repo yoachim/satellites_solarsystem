@@ -1,6 +1,8 @@
 from utils import Constellation, starlink_constellation
 import numpy as np
 import glob
+from rubin_sim.utils import _approx_RaDec2AltAz, Site
+import sys
 
 # Bearing and track length from: 
 # https://stackoverflow.com/questions/32771458/distance-from-lat-lng-point-to-minor-arc-segment
@@ -78,13 +80,12 @@ def pointToLineDistance(lon1, lat1, lon2, lat2, lon3, lat3):
         return result
 
 
-
 def read_ss_objs(filename):
     result = np.genfromtxt(filename, names=True, skip_header=14)
     return result
 
 
-def run_check(path='baseline_nexp2_v1.7_10yrs', streak_tol=20., start_dist=10.):
+def run_check(path='twi_neo_pattern3_v1.7_10yrs', streak_tol1=5., streak_tol2=15., year1=True):
     """
     Paramters
     ---------
@@ -94,29 +95,67 @@ def run_check(path='baseline_nexp2_v1.7_10yrs', streak_tol=20., start_dist=10.):
         How far away to consider a satellite a threat in computing streak (degrees)
     """
 
-    streak_tol = np.radians(streak_tol/3600.)  # to radians
-    start_dist = np.radians(10)
+    site = Site(name='LSST')
+    streak_tol1 = np.radians(streak_tol1/3600.)  # to radians
+    streak_tol2 = np.radians(streak_tol2/3600.)
 
     files = glob.glob(path+'/*.txt')
     arrays = [read_ss_objs(filename) for filename in files]
     ss_data = np.hstack(arrays)
-    # XXX---starting with small constellation for speed to start
-    sats = starlink_constellation(fivek=True, alt_limit=20.)#(supersize=True)
-    const = Constellation(sats)
+    ss_data.sort(order='time')
 
+    # Let's crop down to first year:
+    if year1:
+        good = np.where(ss_data['time'] <= np.min((ss_data['time']+365.25)))[0]
+        ss_data = ss_data[good]
+
+    # XXX---starting with small constellation for speed to start
+    sats = starlink_constellation(supersize=True)
+    const = Constellation(sats, alt_limit=20.)
+    const.advance_epoch(advance=100)
+
+    # array to hold if something is too close to a detection
+    ss_obj_visible1 = np.ones(ss_data.size, dtype=bool)
+    ss_obj_visible2 = np.ones(ss_data.size, dtype=bool)
+
+    _ones = np.ones(ss_data.size)
+
+    ss_alt, ss_az = _approx_RaDec2AltAz(np.radians(ss_data['fieldRA']), np.radians(ss_data['fieldDec']),
+                                        site.latitude_rad*_ones, site.longitude_rad*_ones, ss_data['time'])
 
     # I think I want to output mjd, ra, dec for the satellites that get hit.
-    for mjd_start in np.unique(ss_data['time']):
+    n_max = np.unique(ss_data['time']).size
+    for i, mjd_start in enumerate(np.unique(ss_data['time'])):
         const.update_mjd(mjd_start)
-        alt_rad_start = const.altitudes_rad[const.above_alt_limit] + 0
-        az_rad_start = const.azimuth_rad[const.above_alt_limit] + 0
-        obj_indxs = np.where(ss_data['time'] == mjd_start)
+        alt_rad_start = const.altitudes_rad + 0
+        az_rad_start = const.azimuth_rad + 0
+        obj_indxs = np.where(ss_data['time'] == mjd_start)[0]
+        # Assume they all have the same visit Exposure time
+        const.update_mjd(mjd_start + ss_data[obj_indxs[0]]['visitExposureTime'])
+        alt_rad_end = const.altitudes_rad
+        az_rad_end = const.azimuth_rad
         for obj_indx in obj_indxs:
-            pass
+            distances = pointToLineDistance(az_rad_start, alt_rad_start, az_rad_end, alt_rad_end,
+                                            ss_az[obj_indx]*np.ones(az_rad_start.size),
+                                            ss_alt[obj_indx]*np.ones(az_rad_start.size))
+            if np.min(distances) <= streak_tol1:
+                ss_obj_visible1[obj_indx] = False
+            if np.min(distances) <= streak_tol2:
+                ss_obj_visible2[obj_indx] = False
+        progress = i/n_max*100
+        text = "\rprogress = %.1f%%" % progress
+        sys.stdout.write(text)
+        sys.stdout.flush()
+    result = {'tol_%i' % (np.degrees(streak_tol1)*3600): ss_obj_visible1,
+              'tol_%i' % (np.degrees(streak_tol2)*3600): ss_obj_visible2}
+    return result
+
 
 if __name__ == '__main__':
-    run_check()
-
+    vis = run_check()
+    for key in vis:
+        print(key, np.mean(vis[key]))
+    import pdb ; pdb.set_trace()
 
     
 
