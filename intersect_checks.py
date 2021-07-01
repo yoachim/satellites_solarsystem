@@ -3,6 +3,7 @@ import numpy as np
 import glob
 from rubin_sim.utils import _approx_RaDec2AltAz, Site
 import sys
+import pandas as pd
 
 # Bearing and track length from: 
 # https://stackoverflow.com/questions/32771458/distance-from-lat-lng-point-to-minor-arc-segment
@@ -81,11 +82,19 @@ def pointToLineDistance(lon1, lat1, lon2, lat2, lon3, lat3):
 
 
 def read_ss_objs(filename):
-    result = np.genfromtxt(filename, names=True, skip_header=14)
+    dt = [('objId', '<U8'), ('time', '<f8'), ('ra', '<f8'), ('dec', '<f8'),
+    ('dradt', '<f8'), ('ddecdt', '<f8'), ('phase', '<f8'), ('solarelon', '<f8'),
+    ('helio_dist', '<f8'), ('geo_dist', '<f8'), ('magV', '<f8'), ('trueAnomaly', '<f8'),
+    ('velocity', '<f8'), ('fieldDec', '<f8'), ('fieldRA', '<f8'), ('filter', '<U1'),
+    ('fiveSigmaDepth', '<f8'), ('night', '<f8'), ('observationStartMJD', '<f8'),
+    ('rotSkyPos', '<f8'), ('seeingFwhmEff', '<f8'), ('seeingFwhmGeom', '<f8'), ('solarElong', '<f8'),
+    ('visitExposureTime', '<f8'), ('dmagColor', '<f8'), ('dmagTrail', '<f8'), ('dmagDetect', '<f8')]
+    result = np.genfromtxt(filename, names=True, skip_header=14, dtype=dt)
     return result
 
 
-def run_check(path='twi_neo_pattern3_v1.7_10yrs', streak_tol1=5., streak_tol2=15., year1=True):
+def run_check(path='twi_neo_pattern3_v1.7_10yrs', streak_tol1=5., streak_tol2=15., year1=True,
+              outfile='temp.txt'):
     """
     Paramters
     ---------
@@ -102,8 +111,14 @@ def run_check(path='twi_neo_pattern3_v1.7_10yrs', streak_tol1=5., streak_tol2=15
     files = glob.glob(path+'/*.txt')
     arrays = [read_ss_objs(filename) for filename in files]
     ss_data = np.hstack(arrays)
+
+    # Let's output the initial.
+    df = pd.DataFrame(ss_data)
+    df.to_csv('init_' + path + '__vatiras_granvik_10k.txt', index=False, sep=' ')
+
     ss_data.sort(order='time')
 
+    
     # Let's crop down to first year:
     if year1:
         good = np.where(ss_data['time'] <= np.min((ss_data['time']+365.25)))[0]
@@ -148,11 +163,16 @@ def run_check(path='twi_neo_pattern3_v1.7_10yrs', streak_tol1=5., streak_tol2=15
         sys.stdout.flush()
     result = {'tol_%i' % (np.degrees(streak_tol1)*3600): ss_obj_visible1,
               'tol_%i' % (np.degrees(streak_tol2)*3600): ss_obj_visible2}
+
+    ss_data = ss_data[ss_obj_visible1]
+    _tempdf = pd.DataFrame(ss_data)
+    _tempdf.to_csv(outfile, index=False)
+
     return result
 
 
 if __name__ == '__main__':
-    vis = run_check()
+    vis = run_check(year1=False, outfile='twi_neo_pattern3_survived')
     for key in vis:
         print(key, np.mean(vis[key]))
     import pdb ; pdb.set_trace()
