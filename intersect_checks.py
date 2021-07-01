@@ -166,7 +166,7 @@ def run_check(path='twi_neo_pattern3_v1.7_10yrs', streak_tol1=5., streak_tol2=15
 
     ss_data = ss_data[ss_obj_visible1]
     _tempdf = pd.DataFrame(ss_data)
-    _tempdf.to_csv(outfile, index=False)
+    _tempdf.to_csv(outfile, index=False, sep=' ')
 
     return result
 

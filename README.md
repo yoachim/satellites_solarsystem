@@ -43,3 +43,10 @@ This looks like it works:
 
 run_moving_calc --orbitFile orbit_files/vatiras_granvik_10k.txt --opsimRun twi_neo_pattern3_v1.7_10yrs --opsimDb twi_neo_pattern3_v1.7_10yrs.db --characterization inner --hMin 16.0 --hMax 28.0 --hStep 0.2 --metadata Vatira --nYearsMax 10 --startTime 59853 --outDir vatiras_granvik_10k_init  --obsFile init_twi_neo_pattern3_v1.7_10yrs__vatiras_granvik_10k.txt
 
+run_moving_calc --orbitFile orbit_files/vatiras_granvik_10k.txt --opsimRun twi_neo_pattern3_v1.7_10yrs --opsimDb twi_neo_pattern3_v1.7_10yrs.db --characterization inner --hMin 16.0 --hMax 28.0 --hStep 0.2 --metadata Vatira --nYearsMax 10 --startTime 59853 --outDir vatiras_granvik_10k_after  --obsFile twi_neo_pattern3_survived
+
+and that just makes a bunch of npz files. When do we ever only want a pile of npz files?
+
+run_moving_fractions --workDir vatiras_granvik_10k_init --metadata Vatira --hMark 18
+
+run_moving_fractions --workDir vatiras_granvik_10k_after --metadata Vatira --hMark 18
