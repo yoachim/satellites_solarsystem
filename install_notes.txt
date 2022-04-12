@@ -1,0 +1,17 @@
+Some notes on how to get everything up and running
+
+1) Install anaconda python
+2) Setup a new environement and install pycraf
+conda create -n sat-env -c conda-forge python=3.9 pycraf
+conda activate sat-env
+3) install rubin sim:
+git clone https://github.com/lsst/rubin_sim.git
+cd rubin_sim
+conda install -c conda-forge --file=requirements.txt
+conda install jupyter
+pip install -e .
+rs_download_data
+3) grab skyfield and ephem
+conda install -c conda-forge skyfield
+conda install -c conda-forge ephem
+
